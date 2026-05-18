@@ -18,6 +18,7 @@ fun HomeScreen(navController: NavHostController){
         Modifier.fillMaxSize().padding(40.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ){
+        Text("Practica 2 - Programación Multimedia")
         Button(onClick = {navController.navigate(Routes.AUDIO)}) { Text("Grabar audio") }
         Button(onClick = {navController.navigate(Routes.GRABACIONES)}) { Text("Ver Grabaciones") }
         Button(onClick = {navController.navigate(Routes.CAMERA)}) { Text("Camara") }

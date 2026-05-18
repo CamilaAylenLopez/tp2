@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.camera.core.Preview
+import androidx.compose.foundation.layout.Spacer
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -32,16 +34,17 @@ import java.io.File
 @Composable
 fun CameraScreen(navController: NavHostController){
     val context = LocalContext.current
-
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val (hasCamPerm, requestCamPerm) = rememberCameraPermission()
 
-    var status by remember { mutableStateOf("Listo") }
-
+    var status by remember { mutableStateOf("Inicializando camara...") }
     var lastFileName by remember { mutableStateOf("Ninguna") }
-
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null)}
+
+    var isCapturing by remember { mutableStateOf(false) }
+    val inputFile = remember { AppFiles.latestPhotoFile(context) }
+    var photoExists by remember { mutableStateOf(inputFile.exists()) }
 
     Log.d("CameraDebug", "Permiso cámara: $hasCamPerm")
 
@@ -54,14 +57,15 @@ fun CameraScreen(navController: NavHostController){
         Text("Camara")
 
         if(!hasCamPerm){
+            status = "Conceder permiso a la camara"
             Button(onClick = {requestCamPerm()}) {
-                Text("Solicitar cámara")
+                Text("Solicitar permiso de cámara")
             }
             return@Column
         }
 
         Text("Permiso cámara: ${if (hasCamPerm) "OK" else "NO"}")
-        Text("Estado: ${status}")
+        Text("Estado: $status")
         Text("Última foto: $lastFileName")
 
 
@@ -98,7 +102,7 @@ fun CameraScreen(navController: NavHostController){
                             capture
                         )
 
-                        status = "Preview OK"
+                        status = "Cámara lista para capturar"
                         Log.d("CameraDebug", "Camara enlazada correctamente")
                     } catch (e: Exception){
                         status = "Error camara: ${e.message}"
@@ -110,42 +114,58 @@ fun CameraScreen(navController: NavHostController){
             }
         )
 
-        Button(onClick = {
-            val capture = imageCapture
-            if (capture == null){
-                status = "Image capture no listo"
-                return@Button
-            }
-
-            val file: File = AppFiles.latestPhotoFile(context)
-
-            val options = ImageCapture.OutputFileOptions.Builder(file).build()
-
-            status = "Capturado"
-
-            capture.takePicture(
-                options,
-                ContextCompat.getMainExecutor(context),
-                //resiltado de la foto
-                object : ImageCapture.OnImageSavedCallback {
-                    //exito
-                    override fun onImageSaved(outputFileResult: ImageCapture.OutputFileResults) {
-                        status = "Foto guardada"
-                        lastFileName = file.name
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = {
+                    val capture = imageCapture
+                    if (capture == null) {
+                        status = "Errror: Image capture no listo"
+                        return@Button
                     }
+                    isCapturing = true
+                    status = "Capturando fotografia..."
 
-                    override fun onError(exception: ImageCaptureException) {
-                        status = "Error capturando: ${exception.message}"
-                    }
+                    val file: File = AppFiles.latestPhotoFile(context)
 
-                }
-            )
-        }){ Text("Hacer foto") }
+                    val options = ImageCapture.OutputFileOptions.Builder(file).build()
 
-        Button(onClick = {navController.navigate(Routes.IMAGE)}) { Text("Ver foto") }
+                    capture.takePicture(
+                        options,
+                        ContextCompat.getMainExecutor(context),
+                        //resiltado de la foto
+                        object : ImageCapture.OnImageSavedCallback {
+                            //exito
+                            override fun onImageSaved(outputFileResult: ImageCapture.OutputFileResults) {
+                                isCapturing = false
+                                photoExists = inputFile.exists()
+                                status = "Foto guardada"
+                                lastFileName = file.name
+                            }
 
+                            override fun onError(exception: ImageCaptureException) {
+                                isCapturing = false
+                                status = "Error capturando: ${exception.message}"
+                            }
+                        }
+                    )
+                },
+                enabled = !isCapturing && imageCapture != null,
+                modifier = Modifier.weight(1f)
+            ) { Text("Hacer foto") }
+
+            Button(
+                onClick = { navController.navigate(Routes.IMAGE) },
+                enabled = !isCapturing && photoExists,
+                modifier = Modifier.weight(1f)
+            ) { Text("Ver foto") }
+        }
         Button(
-            onClick = {navController.popBackStack()})
-        { Text("Volver para atrás") }
+            onClick = {navController.popBackStack()},
+            enabled = !isCapturing,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Volver para atrás") }
     }
 }

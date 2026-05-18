@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.isPopupLayout
 import androidx.navigation.NavHostController
 import com.example.tp2.imageproc.ToJpgProcessor
 import com.example.tp2.imageproc.ToPngProcessor
@@ -34,9 +35,13 @@ fun ImageScreen(navController: NavHostController){
     val context = LocalContext.current
     val inputFile = AppFiles.latestPhotoFile(context)
     var fileExits by remember { mutableStateOf(inputFile.exists()) }
-    var status by remember { mutableStateOf("Listo") }
+
+    var status by remember { mutableStateOf("Listo para procesar") }
+    var isProcessing by remember {mutableStateOf(false)}
+
     var original by remember { mutableStateOf<Bitmap?>(null) }
     var processed by remember { mutableStateOf<Bitmap?>(null) }
+
     val toJpgProcessor = remember { ToJpgProcessor() }
     val toPngProcessor = remember { ToPngProcessor() }
 
@@ -46,63 +51,83 @@ fun ImageScreen(navController: NavHostController){
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("Imagen - Convertir PNG a JPG y viceversa")
-        Text("Entrada: ${inputFile.name} (${if (fileExits) "existe" else "no existe, primero toma una foto"})")
-        Text("Estado:${status}")
+        Text("Entrada: ${inputFile.name} (${if (fileExits) "Disponible" else "No se ha encontrado ninguna imagen, toma una foto primero"})")
+        Text("Estado actual: ${status}")
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Button(onClick = {
                 if (fileExits) {
                     original = ImageStorage.loadBitmap(inputFile)
-                    status = "Cargando"
+                    status = "Imagen original cargada"
                     processed = null
                 }else{
-                    status = "El archivo no existe"
+                    status = "Error: No se encontro el archivo"
                 }
             },
-
+                enabled = !isProcessing,
+                modifier = Modifier.weight(1f)
             ) {Text("Cargar foto") }
 
             Button(onClick = {
                 val src = original
-                val file: File = AppFiles.processedJpgFile(context)
                 if (src != null){
-                    status = "Procesando a JPG..."
-                    val resultado = toJpgProcessor.apply(src)
-                    processed = resultado
+                    status = "Convirtiendo y guardando en JPG..."
 
-                    val archivoDestino: File = AppFiles.processedJpgFile(context)
+                    try {
+                        val resultado = toJpgProcessor.apply(src)
+                        processed = resultado
 
-                    val fos = FileOutputStream(archivoDestino)
-                    resultado.compress(Bitmap.CompressFormat.JPEG, 100, fos)
-                    fos.close()
+                        val archivoDestino = AppFiles.processedJpgFile(context)
 
-                    status = "Procesada a JPG  y guardada en: ${archivoDestino.name}"
+                        val fos = FileOutputStream(archivoDestino)
+                        resultado.compress(Bitmap.CompressFormat.JPEG, 100, fos)
+                        fos.close()
+
+                        status = "Imagen procesada a JPG correctamente y guardada en: ${archivoDestino.name}"
+                    }catch (e: Exception){
+                        status = "Error al procesar/guardar JPG: ${e.message}"
+                    }finally {
+                        isProcessing = false
+                    }
+
                 } else{
-                    status = "Primero carga una imagen"
+                    status = "Primero debes cargar la imagen!"
                 }
             },
+                enabled = !isProcessing && original != null,
                 modifier = Modifier.weight(1f)
             ) {Text("Convertir a JPG") }
 
             Button(onClick = {
                 val src = original
-                val file: File = AppFiles.processedJpgFile(context)
                 if (src != null){
-                    status = "Procesando a PNG..."
-                    val resultado = toPngProcessor.apply(src)
-                    processed = resultado
+                    isProcessing = true
+                    status = "Convirtiendo y guardando en PNG..."
 
-                    val archivoDestino: File = AppFiles.processedPngFile(context)
+                    try {
+                        val resultado = toPngProcessor.apply(src)
+                        processed = resultado
 
-                    val fos = FileOutputStream(archivoDestino)
-                    resultado.compress(Bitmap.CompressFormat.PNG, 100, fos)
-                    fos.close()
+                        val archivoDestino = AppFiles.processedPngFile(context)
+                        val fos = FileOutputStream(archivoDestino)
+                        resultado.compress(Bitmap.CompressFormat.PNG, 100, fos)
+                        fos.close()
 
-                    status = "Procesada a PNG y guardada en: ${archivoDestino.name}"
+                        status = "Imagen procesada a PNG correctamente y guardada en: ${archivoDestino.name}"
+                    }catch (e: Exception){
+                        status = "Error al procesar/guardar JPG: ${e.message}"
+                    }finally {
+                        isProcessing = false
+                    }
+
                 } else{
-                    status = "Primero carga una imagen"
+                    status = "Primero debes cargar la imagen!"
                 }
             },
+                enabled = !isProcessing && original != null,
                 modifier = Modifier.weight(1f)
             ) {Text("Convertir a PNG") }
 
@@ -118,7 +143,7 @@ fun ImageScreen(navController: NavHostController){
                     Text(("Original"))
                     androidx.compose.foundation.Image(
                         bitmap = it.asImageBitmap(),
-                        contentDescription = null,
+                        contentDescription = "Imagen original",
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -129,7 +154,7 @@ fun ImageScreen(navController: NavHostController){
                     Text(("Imagen procesada"))
                     androidx.compose.foundation.Image(
                         bitmap = it.asImageBitmap(),
-                        contentDescription = null,
+                        contentDescription = "Imagen procesada",
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -139,7 +164,9 @@ fun ImageScreen(navController: NavHostController){
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
-            onClick = {navController.popBackStack()})
+            onClick = {navController.popBackStack()},
+            modifier = Modifier.fillMaxWidth()
+        )
         { Text("Volver para atrás") }
     }
 }

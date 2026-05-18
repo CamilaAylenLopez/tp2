@@ -31,7 +31,9 @@ fun VideoScreen(navController: NavHostController){
 
     val context = LocalContext.current
 
-    var status by remember { mutableStateOf("Listo") }
+    var status by remember { mutableStateOf("Video no cargado") }
+
+    var isVideoReady by remember { mutableStateOf(false) }
 
     val player = remember {
         ExoPlayer.Builder(context).build()
@@ -43,7 +45,10 @@ fun VideoScreen(navController: NavHostController){
                 status = when(playbackState){
                     Player.STATE_IDLE -> "IDLE"
                     Player.STATE_BUFFERING -> "BUFFERING"
-                    Player.STATE_READY -> "READY"
+                    Player.STATE_READY -> {
+                        isVideoReady = true
+                        "READY"
+                    }
                     Player.STATE_ENDED -> "ENDED"
                     else -> "?"
                 }
@@ -74,21 +79,52 @@ fun VideoScreen(navController: NavHostController){
         )
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Button(onClick = {
-                val uri = Uri.parse("android.resource://${context.packageName}/${R.raw.sample_video}")
-                val item = MediaItem.fromUri(uri)
-                player.setMediaItem(item)
-                player.prepare()
+                try {
+                    status = "Cargando..."
+                    val uri = Uri.parse("android.resource://${context.packageName}/${R.raw.sample_video}")
+                    val item = MediaItem.fromUri(uri)
+                    player.setMediaItem(item)
+                    player.prepare()
+                }catch (e: Exception){
+                    status = "Error al cargar: ${e.message}"
+                }
             }) {Text("Cargar") }
-            Button(onClick = {player.play();status = "Play"}) { Text("Play")}
-            Button(onClick = {player.pause();status = "Pause"}) { Text("Pause")}
-            Button(onClick = {player.seekTo(0);status = "Rewind"}) { Text("Reiniciar")}
+
+            Button(
+                onClick = {
+                    player.play()
+                    status = "Play"
+                },
+                enabled = isVideoReady,
+                modifier = Modifier.weight((1f))
+            ) { Text("Play")}
+
+            Button(
+                onClick = {
+                    player.pause()
+                    status = "Pause"
+                },
+                enabled = isVideoReady,
+                modifier = Modifier.weight((1f))
+            ) { Text("Pause")}
+
+            Button(
+                onClick = {
+                    player.seekTo(0)
+                    status = "Rewind"
+                },
+                enabled = isVideoReady,
+                modifier = Modifier.weight((1f))
+            ) { Text("Reiniciar")}
         }
 
         Button(
-            onClick = {navController.popBackStack()})
-        { Text("Volver para atrás") }
+            onClick = {navController.popBackStack()},
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Volver para atrás") }
     }
 }
